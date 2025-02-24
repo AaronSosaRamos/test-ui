@@ -64,18 +64,27 @@ def chat_ui():
 
 def reasoning_model_ui():
     st.header("🧠 Advanced Reasoning Model")
-    st.markdown("""
-    Choose a specialized model to enhance decision-making and analytical processes.
-    """)
-    model_type = st.selectbox("Select AI Model", ["o1-mini", "o3-mini"])
-    query = st.text_area("Enter your query:")
+    st.markdown("Enhance decision-making and analytical processes with AI.")
+
+    query = st.text_area("Query:", "")
+    expected_output = st.text_input("Expected Output:", "")
+    additional_requirements = st.text_area("Additional Requirements:", "")
+
     if st.button("Analyze Query"):
         headers = {"authorization-key": f"Bearer {st.session_state.get('token', '')}"}
-        response = requests.post(f"{BASE_URL}/helpers/llm-call/reasoning-model", json={"model_type": model_type, "query": query}, headers=headers)
+        payload = {
+            "query": query,
+            "expected_output": expected_output,
+            "additional_requirements": additional_requirements
+        }
+
+        response = requests.post(f"{BASE_URL}/helpers/llm-call/reasoning-model", json=payload, headers=headers)
+
         if response.status_code == 200:
-            st.markdown(f"**Response:** {response.json().get('response', 'No response')}")
+            st.markdown(f"**Response:** {response.json().get('final_response', 'No response')}")
         else:
             st.error("An error occurred while processing your request.")
+
     if st.button("Back to Dashboard"):
         navigate_to("Dashboard")
 
