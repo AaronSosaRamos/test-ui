@@ -1,4 +1,5 @@
 import os
+import time
 import streamlit as st
 import requests
 from dotenv import load_dotenv, find_dotenv
@@ -46,19 +47,62 @@ def main_menu():
     if col3.button("🤖 AI-Powered Agent", use_container_width=True):
         navigate_to("AI-Powered Agent")
 
+
 def chat_ui():
     st.header("💬 Intelligent Assistant - Chat UI")
-    st.markdown("""
-    Engage in seamless conversations powered by our AI-driven assistant.
-    """)
-    query = st.text_area("Enter your query:")
-    if st.button("Submit Query"):
-        headers = {"authorization-key": f"Bearer {st.session_state.get('token', '')}"}
-        response = requests.post(f"{BASE_URL}/helpers/llm-call", json={"query": query}, headers=headers)
-        if response.status_code == 200:
-            st.markdown(f"**Response:** {response.json().get('response', 'No response')}")
-        else:
-            st.error("An error occurred while processing your request.")
+    st.markdown("Engage in seamless conversations powered by our AI-driven assistant.")
+
+    # Initialize chat history in session state if it doesn't exist
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+        st.session_state.chat_history.append({"role": "assistant", "content": "Hello! How can I assist you today?"})
+
+    # Display the conversation using a modern chat layout
+    for message in st.session_state.chat_history:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+    
+    # Input field for the user's query
+    query = st.chat_input("Type your message")
+    
+    if query:
+        # Append user's query to chat history
+        st.session_state.chat_history.append({"role": "user", "content": query})
+        with st.chat_message("user"):
+            st.markdown(query)
+        
+        with st.spinner("Assistant is typing..."):
+            headers = {"authorization-key": f"Bearer {st.session_state.get('token', '')}"}
+            try:
+                response = requests.post(
+                    f"{BASE_URL}/helpers/llm-call",
+                    json={"query": query},
+                    headers=headers
+                )
+                if response.status_code == 200:
+                    assistant_response = response.json().get("response", "No response")
+                else:
+                    assistant_response = "An error occurred while processing your request."
+            except Exception:
+                assistant_response = "An error occurred while processing your request."
+
+        # Streaming response simulation
+        def word_by_word(text):
+            words = text.split()
+            for i, word in enumerate(words):
+                yield word + (" " if i < len(words)-1 else "")
+                time.sleep(0.1)  # Simulate typing delay
+
+        with st.chat_message("assistant"):
+            streamed_text = st.write_stream(word_by_word(assistant_response))
+        st.session_state.chat_history.append({"role": "assistant", "content": streamed_text})
+    
+    # Clear conversation button
+    if st.button("🗑️ Clear Conversation"):
+        st.session_state.chat_history = []
+        st.rerun()
+    
+    # Navigation button
     if st.button("Back to Dashboard"):
         navigate_to("Dashboard")
 
