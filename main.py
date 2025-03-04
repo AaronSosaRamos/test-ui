@@ -107,50 +107,122 @@ def chat_ui():
         navigate_to("Dashboard")
 
 def reasoning_model_ui():
-    st.header("🧠 Advanced Reasoning Model")
+    st.header("🧠 Deep Search - CoAT Agent")
     st.markdown("Enhance decision-making and analytical processes with AI.")
 
-    query = st.text_area("Query:", "")
-    expected_output = st.text_input("Expected Output:", "")
-    additional_requirements = st.text_area("Additional Requirements:", "")
+    # Initialize chat history
+    if "reasoning_chat_history" not in st.session_state:
+        st.session_state.reasoning_chat_history = []
+        st.session_state.reasoning_chat_history.append({"role": "assistant", "content": "Hello! How can I assist with your reasoning needs today?"})
 
-    if st.button("Analyze Query"):
-        headers = {"authorization-key": f"Bearer {st.session_state.get('token', '')}"}
-        payload = {
-            "query": query,
-            "expected_output": expected_output,
-            "additional_requirements": additional_requirements
-        }
+    # Display chat history
+    for message in st.session_state.reasoning_chat_history:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+    
+    # User input field
+    query = st.chat_input("Type your reasoning query")
+    
+    if query:
+        # Append user query to chat history
+        st.session_state.reasoning_chat_history.append({"role": "user", "content": query})
+        with st.chat_message("user"):
+            st.markdown(query)
+        
+        with st.spinner("Analyzing..."):
+            headers = {"authorization-key": f"Bearer {st.session_state.get('token', '')}"}
+            payload = {"query": query}
+            
+            try:
+                response = requests.post(f"{BASE_URL}/helpers/deep-search/coat-multi-agent", json=payload, headers=headers)
+                if response.status_code == 200:
+                    response_json = response.json()
+                    results = response_json.get("results", "No results found")
+                    searched_urls = response_json.get("searched_urls", [])
+                    exact_references = response_json.get("exact_references", [])
+                    assistant_response = f"{results}\n\n**Searched URLs:** {', '.join(searched_urls)}\n**Exact References:** {', '.join(exact_references)}"
+                else:
+                    assistant_response = "An error occurred while processing your request."
+            except Exception:
+                assistant_response = "An error occurred while processing your request."
 
-        response = requests.post(f"{BASE_URL}/helpers/llm-call/reasoning-model", json=payload, headers=headers)
+        # Streaming response simulation
+        def word_by_word(text):
+            words = text.split()
+            for i, word in enumerate(words):
+                yield word + (" " if i < len(words)-1 else "")
+                time.sleep(0.1)
 
-        if response.status_code == 200:
-            st.markdown(f"**Response:** {response.json().get('final_response', 'No response')}")
-        else:
-            st.error("An error occurred while processing your request.")
-
+        with st.chat_message("assistant"):
+            streamed_text = st.write_stream(word_by_word(assistant_response))
+        st.session_state.reasoning_chat_history.append({"role": "assistant", "content": streamed_text})
+    
+    # Clear conversation button
+    if st.button("🗑️ Clear Conversation"):
+        st.session_state.reasoning_chat_history = []
+        st.rerun()
+    
+    # Navigation button
     if st.button("Back to Dashboard"):
         navigate_to("Dashboard")
 
 def agent_call_ui():
-    st.header("🤖 AI-Powered Agent Interface")
-    st.markdown("""
-    Leverage AI agents for complex data retrieval and research insights.
-    """)
-    agent_type = st.selectbox("Select Agent Type", ["web-agent", "multi-agent"])
-    query = st.text_area("Enter your query:")
-    if st.button("Retrieve Insights"):
-        headers = {"authorization-key": f"Bearer {st.session_state.get('token', '')}"}
-        response = requests.post(f"{BASE_URL}/helpers/agent-call/{agent_type}", json={"query": query}, headers=headers)
-        if response.status_code == 200:
-            data = response.json()
-            st.markdown(f"**Answer:** {data.get('answer', 'No answer')}")
-            if "results" in data:
-                st.subheader("Additional Resources")
-                for result in data["results"]:
-                    st.markdown(f"- [{result['title']}]({result['url']}) - {result['snippet']}")
-        else:
-            st.error("An error occurred while processing your request.")
+    st.header("🤖 AI-Powered Web Search Agent Interface")
+    st.markdown("Leverage AI agents for complex data retrieval and research insights.")
+
+    # Initialize chat history
+    if "agent_chat_history" not in st.session_state:
+        st.session_state.agent_chat_history = []
+        st.session_state.agent_chat_history.append({"role": "assistant", "content": "Hello! How can I assist with your research today?"})
+
+    # Display chat history
+    for message in st.session_state.agent_chat_history:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+    
+    # User input field
+    query = st.chat_input("Type your search query")
+    
+    if query:
+        # Append user query to chat history
+        st.session_state.agent_chat_history.append({"role": "user", "content": query})
+        with st.chat_message("user"):
+            st.markdown(query)
+        
+        with st.spinner("Retrieving insights..."):
+            headers = {"authorization-key": f"Bearer {st.session_state.get('token', '')}"}
+            payload = {"query": query}
+            
+            try:
+                response = requests.post(f"{BASE_URL}/helpers/agent-call/web-agent", json=payload, headers=headers)
+                if response.status_code == 200:
+                    response_json = response.json()
+                    answer = response_json.get("answer", "No answer found")
+                    results = response_json.get("results", [])
+                    additional_resources = "\n".join([f"- [{res['title']}]({res['url']}) - {res['snippet']}" for res in results])
+                    assistant_response = f"{answer}\n\n**Additional Resources:**\n{additional_resources}"
+                else:
+                    assistant_response = "An error occurred while processing your request."
+            except Exception:
+                assistant_response = "An error occurred while processing your request."
+
+        # Streaming response simulation
+        def word_by_word(text):
+            words = text.split()
+            for i, word in enumerate(words):
+                yield word + (" " if i < len(words)-1 else "")
+                time.sleep(0.1)
+
+        with st.chat_message("assistant"):
+            streamed_text = st.write_stream(word_by_word(assistant_response))
+        st.session_state.agent_chat_history.append({"role": "assistant", "content": streamed_text})
+    
+    # Clear conversation button
+    if st.button("🗑️ Clear Conversation"):
+        st.session_state.agent_chat_history = []
+        st.rerun()
+    
+    # Navigation button
     if st.button("Back to Dashboard"):
         navigate_to("Dashboard")
 
